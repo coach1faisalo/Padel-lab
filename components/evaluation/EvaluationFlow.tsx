@@ -31,8 +31,21 @@ export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, on
     onSaveDraft(draft);
   }, [draft, onSaveDraft]);
 
+  useEffect(() => {
+    if (initialDraft) setDraft(initialDraft);
+  }, [initialDraft]);
+
   function touchedKey(category: CategoryKey, skillId: string) {
     return `${category}:${skillId}`;
+  }
+
+  function noteKey(category: CategoryKey, index: number) {
+    return `${category}:${index}`;
+  }
+
+  function noteIsSelected(category: CategoryKey, index: number, noteText: string) {
+    const selected = draft.notes[category];
+    return selected.includes(noteKey(category, index)) || selected.includes(noteText) || selected.includes(suggestedNotes[category][index]) || selected.includes(suggestedNotesAr[category][index]);
   }
 
   function scoreTone(value: number, touched = true) {
@@ -57,11 +70,36 @@ export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, on
     }));
   }
 
-  function toggleNote(category: CategoryKey, note: string) {
+  function toggleNote(category: CategoryKey, index: number, note: string) {
     setDraft((current) => {
-      const exists = current.notes[category].includes(note);
-      return { ...current, notes: { ...current.notes, [category]: exists ? current.notes[category].filter((item) => item !== note) : [...current.notes[category], note] } };
+      const key = noteKey(category, index);
+      const englishNote = suggestedNotes[category][index];
+      const arabicNote = suggestedNotesAr[category][index];
+      const exists = current.notes[category].includes(key) || current.notes[category].includes(note) || current.notes[category].includes(englishNote) || current.notes[category].includes(arabicNote);
+      return {
+        ...current,
+        notes: {
+          ...current.notes,
+          [category]: exists
+            ? current.notes[category].filter((item) => item !== key && item !== note && item !== englishNote && item !== arabicNote)
+            : [...current.notes[category], key]
+        }
+      };
     });
+  }
+
+  function validateAndFinalize() {
+    if (!draft.playerIds.length) {
+      window.alert(isArabic ? "اختر لاعبًا قبل إنشاء التقرير." : "Choose a player before generating a report.");
+      return;
+    }
+    const touchedCount = categories.reduce((sum, category) => sum + category.skills.filter((skill) => draft.touchedSkills?.[touchedKey(category.key, skill.id)]).length, 0);
+    const totalSkills = categories.reduce((sum, category) => sum + category.skills.length, 0);
+    if (touchedCount < totalSkills) {
+      const proceed = window.confirm(isArabic ? "بعض المهارات غير مقيّمة بعد. هل تريد إنشاء التقرير بالدرجات الحالية؟" : "Some skills are still not rated. Generate the report with the current scores?");
+      if (!proceed) return;
+    }
+    onFinalize(draft);
   }
 
   return (
@@ -164,8 +202,8 @@ export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, on
                   <div>
                     <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-ivory/45">{t.evaluation.suggestedNotes}</p>
                     <div className="flex flex-wrap gap-2">
-                      {(isArabic ? suggestedNotesAr[category.key] : suggestedNotes[category.key]).map((note) => (
-                        <button key={note} onClick={() => toggleNote(category.key, note)} className={clsx("rounded-full border px-3 py-2 text-left text-xs font-semibold transition", draft.notes[category.key].includes(note) ? "border-volt bg-volt/15 text-amber" : "border-line bg-white/[0.04] text-ivory/65")}>{note}</button>
+                      {(isArabic ? suggestedNotesAr[category.key] : suggestedNotes[category.key]).map((note, index) => (
+                        <button key={noteKey(category.key, index)} onClick={() => toggleNote(category.key, index, note)} className={clsx("rounded-full border px-3 py-2 text-left text-xs font-semibold transition", noteIsSelected(category.key, index, note) ? "border-volt bg-volt/15 text-amber" : "border-line bg-white/[0.04] text-ivory/65")}>{note}</button>
                       ))}
                     </div>
                   </div>
@@ -180,7 +218,7 @@ export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, on
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-graphite/95 p-3 backdrop-blur md:left-72">
         <div className="mx-auto flex max-w-5xl gap-2">
           <Button variant="secondary" className="flex-1" onClick={() => { onSaveDraft(draft); window.alert(t.evaluation.draftSaved); }}><Save size={18} /> {t.evaluation.saveDraft}</Button>
-          <Button className="flex-1" disabled={!draft.playerIds.length} onClick={() => onFinalize(draft)}><FileCheck2 size={18} /> {t.evaluation.generate}</Button>
+          <Button className="flex-1 shadow-[0_0_36px_rgba(255,182,84,0.22)]" disabled={!draft.playerIds.length} onClick={validateAndFinalize}><FileCheck2 size={18} /> {t.evaluation.generate}</Button>
         </div>
       </div>
     </section>

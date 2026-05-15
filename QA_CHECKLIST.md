@@ -42,10 +42,15 @@
 - Dashboard player search routes intelligently: latest report if available, evaluation flow if no report exists.
 - Players page supports add, edit, delete, and protected delete confirmation with localStorage persistence.
 - Evaluation drafts auto-save sliders, selected notes, manual notes, selected player, and touched scoring state.
+- Suggested coaching notes are stored with stable note keys so selections survive Arabic/English switching, route changes, and refreshes.
 - Evaluation scoring indicators use white for untouched skills, green for strong, amber for medium, and red for weak.
 - Reports page includes searchable player/report selection and no-report fallback actions.
+- Reports page includes a player report dropdown and recent reports strip for faster mobile switching.
 - PDF export no longer uses screenshot capture.
 - PDF export respects selected report language: Arabic, English, or bilingual.
+- PDF export includes logo, coach branding, current date, player name, evaluation type, match context, category score bars, roadmap, footer branding, and a structured radar chart.
+- PDF export embeds `public/fonts/SFArabic.ttf` for more reliable Arabic rendering in production browsers.
+- Report generation now considers selected coach observations in addition to category and skill score patterns.
 - Logo appears on dashboard, players, evaluation, reports, and structured PDF export.
 
 ## Manual Testing Recommended

@@ -110,7 +110,8 @@ export default function Home() {
         style,
         categoryScores,
         skillScores: nextDraft.skillScores,
-        manualNotes: nextDraft.manualNotes
+        manualNotes: nextDraft.manualNotes,
+        notes: nextDraft.notes
       })
     };
     const next = saveEvaluation(evaluation);

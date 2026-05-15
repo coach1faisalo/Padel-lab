@@ -103,6 +103,8 @@ export function ReportView({
     const currentPlayer = player;
     const { jsPDF } = await import("jspdf");
     const pdf = new jsPDF("p", "mm", "a4");
+    if (showArabic) await registerArabicPdfFont(pdf);
+    const bodyFont = showArabic ? "SFArabic" : "helvetica";
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 16;
@@ -110,15 +112,28 @@ export function ReportView({
     const isPdfArabic = reportLanguage === "ar";
     const align = isPdfArabic ? "right" : "left";
     const textX = isPdfArabic ? pageWidth - margin : margin;
+    const decoratePage = () => {
+      pdf.setFillColor(5, 8, 13);
+      pdf.rect(0, 0, pageWidth, pageHeight, "F");
+      pdf.setFillColor(247, 251, 246);
+      pdf.roundedRect(8, 8, pageWidth - 16, pageHeight - 16, 4, 4, "F");
+      pdf.setDrawColor(227, 107, 55);
+      pdf.line(margin, pageHeight - 13, pageWidth - margin, pageHeight - 13);
+      pdf.setFont(bodyFont, showArabic ? "normal" : "bold");
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(80, 90, 90);
+      pdf.text("Coach Faisal Padel Performance Lab / كوتش فيصل بادل لاب", pageWidth / 2, pageHeight - 8, { align: "center" });
+    };
 
     const addText = (text: string, size = 10, color: [number, number, number] = [38, 38, 38], bold = false) => {
-      pdf.setFont("helvetica", bold ? "bold" : "normal");
+      pdf.setFont(bodyFont, showArabic ? "normal" : bold ? "bold" : "normal");
       pdf.setFontSize(size);
       pdf.setTextColor(...color);
       const lines = pdf.splitTextToSize(text, pageWidth - margin * 2);
       lines.forEach((line: string) => {
         if (y > pageHeight - 20) {
           pdf.addPage();
+          decoratePage();
           y = 18;
         }
         pdf.text(line, textX, y, { align });
@@ -136,10 +151,7 @@ export function ReportView({
       items.forEach((item) => addText(`• ${item}`, 9.5, [62, 62, 62]));
     };
 
-    pdf.setFillColor(5, 8, 13);
-    pdf.rect(0, 0, pageWidth, pageHeight, "F");
-    pdf.setFillColor(247, 251, 246);
-    pdf.roundedRect(8, 8, pageWidth - 16, pageHeight - 16, 4, 4, "F");
+    decoratePage();
     try {
       const logo = await imageToDataUrl("/logo/app-logo-icon.png");
       pdf.addImage(logo, "PNG", margin, 14, 18, 18);
@@ -153,20 +165,25 @@ export function ReportView({
     pdf.text("Coach Faisal Padel Performance Lab", margin + 23, 22);
     pdf.setFontSize(9);
     pdf.setTextColor(130, 95, 50);
+    pdf.setFont(bodyFont, "normal");
     pdf.text("كوتش فيصل بادل لاب", margin + 23, 28);
+    pdf.setTextColor(85, 95, 95);
+    pdf.text(new Date().toLocaleDateString(reportLanguage === "ar" ? "ar-KW" : "en-US"), pageWidth - margin, 22, { align: "right" });
     y = 42;
 
     pdf.setFillColor(11, 21, 26);
     pdf.roundedRect(margin, y, pageWidth - margin * 2, 42, 4, 4, "F");
     pdf.setTextColor(255, 182, 84);
-    pdf.setFont("helvetica", "bold");
+    pdf.setFont(bodyFont, showArabic ? "normal" : "bold");
     pdf.setFontSize(12);
     pdf.text(reportTitle("Final Score", "الدرجة النهائية"), textX, y + 10, { align });
     pdf.setFontSize(34);
     pdf.text(String(currentEvaluation.finalScore), textX, y + 28, { align });
     pdf.setFontSize(10);
     pdf.setTextColor(247, 251, 246);
-    pdf.text(`${currentPlayer.name}  •  ${reportTitle(currentEvaluation.level, t.levels[currentEvaluation.level as keyof typeof t.levels])}  •  ${reportTitle(currentEvaluation.style, t.styles[currentEvaluation.style as keyof typeof t.styles])}`, textX, y + 37, { align });
+    const evaluationType = currentEvaluation.evaluationType === "match" ? reportTitle("Match Evaluation", "تقييم مباراة") : reportTitle("Session Evaluation", "تقييم تدريب");
+    pdf.text(`${currentPlayer.name}  •  ${evaluationType}  •  ${currentEvaluation.matchType}`, textX, y + 34, { align });
+    pdf.text(`${reportTitle(currentEvaluation.level, t.levels[currentEvaluation.level as keyof typeof t.levels])}  •  ${reportTitle(currentEvaluation.style, t.styles[currentEvaluation.style as keyof typeof t.styles])}`, textX, y + 39, { align });
     y += 54;
 
     addSection("Performance Summary", "ملخص الأداء");
@@ -180,6 +197,7 @@ export function ReportView({
       pdf.roundedRect(margin, y, pageWidth - margin * 2, 9, 2, 2, "F");
       pdf.setFillColor(...hexToRgb(category.accent));
       pdf.roundedRect(margin, y, (pageWidth - margin * 2) * (currentEvaluation.categoryScores[category.key] / category.weight), 9, 2, 2, "F");
+      pdf.setFont(bodyFont, "normal");
       pdf.setFontSize(8.5);
       pdf.setTextColor(8, 17, 22);
       pdf.text(`${categoryLabel(category)}: ${currentEvaluation.categoryScores[category.key]} / ${category.weight}`, textX, y + 6.2, { align });
@@ -212,6 +230,7 @@ export function ReportView({
 
     if (y > pageHeight - 46) {
       pdf.addPage();
+      decoratePage();
       y = 18;
     }
     drawPdfRadar(pdf, currentEvaluation, reportLanguage, margin, y + 5, pageWidth - margin * 2, 56);
@@ -393,6 +412,9 @@ function ReportSelector({
   onStartEvaluation?: (playerId: string) => void;
 }) {
   const { language } = useLanguage();
+  const reports = reportOptions
+    .filter((option): option is { player: Player; latest: Evaluation } => Boolean(option.latest))
+    .sort((a, b) => new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime());
   return (
     <div className="rounded-2xl border border-line bg-panel/80 p-4 shadow-blueglow">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -402,6 +424,16 @@ function ReportSelector({
         </div>
         <Search className="text-cyan" size={18} />
       </div>
+      <select
+        value={selectedId ?? ""}
+        onChange={(event) => event.target.value && onSelectEvaluation?.(event.target.value)}
+        className="mb-3 h-11 w-full rounded-xl border border-line bg-black/25 px-3 text-sm font-bold text-ivory outline-none focus:border-amber/60"
+      >
+        <option value="">{language === "ar" ? "اختر أحدث تقرير" : "Select latest report"}</option>
+        {reports.map(({ player, latest }) => (
+          <option key={latest.id} value={latest.id}>{player.name} - {latest.finalScore}/100</option>
+        ))}
+      </select>
       <input value={search} onChange={(event) => onSearch(event.target.value)} className="h-11 w-full rounded-xl border border-line bg-black/25 px-3 text-sm text-ivory outline-none focus:border-cyan/60" placeholder={language === "ar" ? "ابحث عن لاعب" : "Search player"} />
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {reportOptions.slice(0, 8).map(({ player, latest }) => (
@@ -417,6 +449,19 @@ function ReportSelector({
           </button>
         ))}
       </div>
+      {reports.length > 0 && (
+        <div className="mt-4 border-t border-line pt-4">
+          <p className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-ivory/40">{language === "ar" ? "آخر التقارير" : "Recent Reports"}</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {reports.slice(0, 6).map(({ player, latest }) => (
+              <button key={`recent-${latest.id}`} onClick={() => onSelectEvaluation?.(latest.id)} className={`min-w-[150px] rounded-xl border px-3 py-2 text-left text-xs transition ${latest.id === selectedId ? "border-amber/60 bg-amber/15 text-amber" : "border-line bg-white/[0.04] text-ivory/65"}`}>
+                <span className="block font-black text-ivory">{player.name}</span>
+                <span>{latest.finalScore}/100</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -430,6 +475,23 @@ async function imageToDataUrl(src: string) {
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
+}
+
+async function registerArabicPdfFont(pdf: { addFileToVFS: (filename: string, data: string) => void; addFont: (filename: string, fontName: string, fontStyle: string) => void }) {
+  const response = await fetch("/fonts/SFArabic.ttf");
+  const fontData = arrayBufferToBase64(await response.arrayBuffer());
+  pdf.addFileToVFS("SFArabic.ttf", fontData);
+  pdf.addFont("SFArabic.ttf", "SFArabic", "normal");
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return window.btoa(binary);
 }
 
 function hexToRgb(hex: string): [number, number, number] {

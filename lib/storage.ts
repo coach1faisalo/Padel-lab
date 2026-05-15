@@ -63,7 +63,13 @@ export function saveEvaluation(evaluation: Evaluation): AppData {
 export function loadDraft(): DraftEvaluation | null {
   if (!isBrowser()) return null;
   const stored = window.localStorage.getItem(DRAFT_KEY);
-  return stored ? (JSON.parse(stored) as DraftEvaluation) : null;
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored) as DraftEvaluation;
+  } catch {
+    window.localStorage.removeItem(DRAFT_KEY);
+    return null;
+  }
 }
 
 export function saveDraft(draft: DraftEvaluation) {
