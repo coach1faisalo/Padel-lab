@@ -489,7 +489,12 @@ function arrayBufferToBase64(buffer: ArrayBuffer) {
   let binary = "";
   const chunkSize = 0x8000;
   for (let index = 0; index < bytes.length; index += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+    const chunk = bytes.subarray(index, index + chunkSize);
+    let chunkBinary = "";
+    for (let chunkIndex = 0; chunkIndex < chunk.length; chunkIndex += 1) {
+      chunkBinary += String.fromCharCode(chunk[chunkIndex]);
+    }
+    binary += chunkBinary;
   }
   return window.btoa(binary);
 }
