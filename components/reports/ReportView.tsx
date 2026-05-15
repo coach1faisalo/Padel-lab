@@ -64,6 +64,7 @@ export function ReportView({ evaluation, player }: { evaluation: Evaluation | nu
   const categoryLabel = (category: (typeof categories)[number]) => showArabic && showEnglish ? `${category.labelAr} / ${category.label}` : showArabic ? category.labelAr : category.label;
 
   async function exportPdf() {
+    if (!player) return;
     const element = document.getElementById("report-export");
     if (!element) return;
     const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
