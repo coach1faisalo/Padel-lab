@@ -18,6 +18,13 @@ export default function Home() {
   const [draft, setDraft] = useState<DraftEvaluation | null>(null);
   const [search, setSearch] = useState("");
 
+  const openView = useCallback((nextView: ViewKey) => {
+    if (nextView === "evaluation") {
+      setDraft(loadDraft());
+    }
+    setView(nextView);
+  }, []);
+
   useEffect(() => {
     const loaded = loadAppData();
     setData(loaded);
@@ -61,7 +68,7 @@ export default function Home() {
     const latest = latestEvaluationForPlayer(playerId);
     if (latest) {
       setSelectedEvaluationId(latest.id);
-      setView("report");
+      openView("report");
       return;
     }
     const nextDraft: DraftEvaluation = {
@@ -75,7 +82,7 @@ export default function Home() {
     };
     saveDraft(nextDraft);
     setDraft(nextDraft);
-    setView("evaluation");
+    openView("evaluation");
   }
 
   const persistDraft = useCallback((nextDraft: DraftEvaluation) => {
@@ -118,21 +125,21 @@ export default function Home() {
     setData(next);
     setSelectedEvaluationId(id);
     setDraft(null);
-    setView("report");
+    openView("report");
   }
 
   return (
-    <AppShell view={view} onView={setView}>
+    <AppShell view={view} onView={openView}>
       {view === "dashboard" && (
         <Dashboard
           data={data}
           search={search}
           onSearch={setSearch}
-          onNewEvaluation={() => setView("evaluation")}
+          onNewEvaluation={() => openView("evaluation")}
           onSelectPlayer={openPlayer}
           onSelectEvaluation={(id) => {
             setSelectedEvaluationId(id);
-            setView("report");
+            openView("report");
           }}
         />
       )}

@@ -26,6 +26,8 @@ export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, on
   const finalScore = calculateFinalScore(scores);
   const level = getPlayerLevel(finalScore);
   const style = detectPlayingStyle(scores, draft.skillScores);
+  const touchedCount = categories.reduce((sum, category) => sum + category.skills.filter((skill) => draft.touchedSkills?.[touchedKey(category.key, skill.id)]).length, 0);
+  const totalSkills = categories.reduce((sum, category) => sum + category.skills.length, 0);
 
   useEffect(() => {
     onSaveDraft(draft);
@@ -93,8 +95,6 @@ export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, on
       window.alert(isArabic ? "اختر لاعبًا قبل إنشاء التقرير." : "Choose a player before generating a report.");
       return;
     }
-    const touchedCount = categories.reduce((sum, category) => sum + category.skills.filter((skill) => draft.touchedSkills?.[touchedKey(category.key, skill.id)]).length, 0);
-    const totalSkills = categories.reduce((sum, category) => sum + category.skills.length, 0);
     if (touchedCount < totalSkills) {
       const proceed = window.confirm(isArabic ? "بعض المهارات غير مقيّمة بعد. هل تريد إنشاء التقرير بالدرجات الحالية؟" : "Some skills are still not rated. Generate the report with the current scores?");
       if (!proceed) return;
@@ -213,6 +213,25 @@ export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, on
             </div>
           );
         })}
+      </div>
+
+      <div className="rounded-[1.75rem] border border-amber/30 bg-[radial-gradient(circle_at_top_right,rgba(255,182,84,0.20),transparent_34%),linear-gradient(135deg,rgba(12,29,35,0.96),rgba(5,9,14,0.94))] p-5 shadow-[0_22px_80px_rgba(0,0,0,0.34),0_0_42px_rgba(255,182,84,0.12)]">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-amber">{isArabic ? "جاهز للتقرير" : "Report Ready"}</p>
+            <h2 className="mt-1 text-2xl font-black text-ivory">{isArabic ? "أنشئ تقرير اللاعب" : "Generate Player Report"}</h2>
+            <p className="mt-2 text-sm leading-6 text-ivory/60">
+              {isArabic ? `تم حفظ ${touchedCount} من ${totalSkills} مهارة تلقائيًا. كل تغيير محفوظ محليًا.` : `${touchedCount} of ${totalSkills} skills saved automatically. Every change is stored locally.`}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-line bg-black/25 px-5 py-4 text-center">
+            <p className="text-4xl font-black text-amber">{finalScore}</p>
+            <p className="text-xs font-bold text-ivory/55">{t.levels[level as keyof typeof t.levels]}</p>
+          </div>
+        </div>
+        <Button className="mt-5 min-h-14 w-full rounded-2xl text-base shadow-[0_0_42px_rgba(255,182,84,0.28)]" disabled={!draft.playerIds.length} onClick={validateAndFinalize}>
+          <FileCheck2 size={21} /> {t.evaluation.generate}
+        </Button>
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-graphite/95 p-3 backdrop-blur md:left-72">
