@@ -99,7 +99,18 @@
     function finalScore(cs){return Math.round(Object.values(cs).reduce((a,b)=>a+b,0))}
     function level(s){return s>=90?"Advanced":s>=85?"Upper Intermediate":s>=70?"Intermediate":s>=50?"Lower Intermediate":"Beginner"}
     function style(cs,ss){let p=cs.positioning/40*5,t=cs.tactics/10*5,f=cs.fitness/20*5,tr=cs.transition/10*5,te=cs.technique/20*5;if(p>=4&&t>=4&&ss.positioning["Net Control Positioning"]>=4)return"Smart Net Controller";if(p>=4)return"Net Controller";if(f>=4&&tr>=4)return"Fast Transition Player";if(te>=4&&t<3.5)return"Technical Player";if(t>=4)return"Tactical Thinker";return"Smart Builder"}
-    function report(ev){let sorted=[...categories].sort((a,b)=>(ev.categoryScores[b[0]]/b[2])-(ev.categoryScores[a[0]]/a[2]));let weak=[...sorted].reverse();return{summary:`You are currently profiled as a ${ev.style}. Your strongest indicators are ${sorted[0][1].toLowerCase()} and ${sorted[1][1].toLowerCase()}, while the next jump will come from sharper ${weak[0][1].toLowerCase()} habits.`,strengths:sorted.slice(0,2).flatMap(c=>c[5].filter(s=>ev.skillScores[c[0]][s]>=4).slice(0,2)),weaknesses:weak.slice(0,3).map(c=>`Improve ${c[1].toLowerCase()} consistency under pressure`),priorities:weak.slice(0,3).map(c=>`${c[1]} repetition under match pressure`),insight:`Your best performance appears when controlling tempo near the net. Awareness must stay ahead of random aggression.`,road1:`Movement base: ${weak[0][1]} and recovery habits.`,road2:`Pressure layer: ${weak[1][1]} and tactical control.`}}
+    function report(ev){
+      let sorted=[...categories].sort((a,b)=>(ev.categoryScores[b[0]]/b[2])-(ev.categoryScores[a[0]]/a[2])),weak=[...sorted].reverse();
+      return{
+        summary:`You are currently profiled as a ${ev.style}. Your strongest indicators are ${catEn(sorted[0]).toLowerCase()} and ${catEn(sorted[1]).toLowerCase()} while the next jump will come from sharper ${catEn(weak[0]).toLowerCase()} habits.`,
+        strengths:sorted.slice(0,2).flatMap(c=>c[5].filter(s=>ev.skillScores[c[0]][s]>=4).slice(0,2)),
+        weaknesses:weak.slice(0,3).map(c=>`Improve ${catEn(c).toLowerCase()} consistency under pressure`),
+        priorities:weak.slice(0,3).map(c=>`${catEn(c)} repetition under match pressure`),
+        insight:`Your best performance appears when controlling tempo near the net. Awareness must stay ahead of random aggression.`,
+        road1:`Movement base: ${catEn(weak[0])} and recovery habits.`,
+        road2:`Pressure layer: ${catEn(weak[1]||weak[0])} and tactical control.`
+      }
+    }
     if(!data.evaluations.length){let cs=scoreCats(baseScores),fs=finalScore(cs);data.evaluations.push({id:"e1",playerIds:["p1"],evaluationType:"match",matchType:"Competitive",skillScores:baseScores,categoryScores:cs,finalScore:fs,level:level(fs),style:style(cs,baseScores),createdAt:new Date().toISOString(),manualNotes:draft.manualNotes,notes:draft.notes});save()}
     let view="dashboard",selected=data.evaluations[0].id;
     function save(){localStorage.setItem(key,JSON.stringify(data))}

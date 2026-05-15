@@ -5,7 +5,8 @@ import { ar } from "@/locales/ar";
 import { en } from "@/locales/en";
 
 export type Language = "en" | "ar";
-type Dictionary = typeof en;
+type WidenStrings<T> = T extends string ? string : { [K in keyof T]: WidenStrings<T[K]> };
+type Dictionary = WidenStrings<typeof en>;
 
 const LANGUAGE_KEY = "coach-faisal-padel-lab:language";
 
