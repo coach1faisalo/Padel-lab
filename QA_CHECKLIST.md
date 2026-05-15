@@ -13,7 +13,7 @@
 - Draft save persists to localStorage.
 - Final evaluation persists to localStorage.
 - Report page renders final score, level, style, summary, breakdown, radar chart, strengths, development areas, priorities, coaching insight, and roadmap.
-- PDF export is wired through `html2canvas` and `jspdf`.
+- PDF export is wired through a structured `jspdf` template.
 - Empty/no-report state exists.
 - Mobile bottom navigation exists.
 - Desktop sidebar navigation exists.
@@ -37,6 +37,17 @@
 - Clay-court sports-tech palette applied to Tailwind tokens.
 - Preview page updated for immediate visual review.
 
+## Product Fix Checks
+
+- Dashboard player search routes intelligently: latest report if available, evaluation flow if no report exists.
+- Players page supports add, edit, delete, and protected delete confirmation with localStorage persistence.
+- Evaluation drafts auto-save sliders, selected notes, manual notes, selected player, and touched scoring state.
+- Evaluation scoring indicators use white for untouched skills, green for strong, amber for medium, and red for weak.
+- Reports page includes searchable player/report selection and no-report fallback actions.
+- PDF export no longer uses screenshot capture.
+- PDF export respects selected report language: Arabic, English, or bilingual.
+- Logo appears on dashboard, players, evaluation, reports, and structured PDF export.
+
 ## Manual Testing Recommended
 
 - Test on an actual iPhone viewport in Safari.
@@ -45,3 +56,5 @@
 - Refresh after generating a report and confirm history remains.
 - Add several players and confirm the selected player appears in new evaluations.
 - Run `npm run build` before Vercel deployment.
+- Run `npm run typecheck` before deployment when Node/npm dependencies are installed.
+- Export Arabic PDFs on the target browser and confirm Arabic glyph shaping meets brand quality.

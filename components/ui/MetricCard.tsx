@@ -8,7 +8,7 @@ export function MetricCard({ label, value, icon: Icon, tone = "volt" }: { label:
       <div className={`relative mb-3 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white/8 ${color}`}>
         <Icon size={18} />
       </div>
-      <p className="relative text-xs uppercase tracking-[0.22em] text-ivory/45">{label}</p>
+      <p className="relative text-xs font-black uppercase leading-5 tracking-[0.16em] text-ivory/55">{label}</p>
       <p className="relative mt-1 text-3xl font-black tracking-[-0.04em] text-ivory">{value}</p>
     </div>
   );

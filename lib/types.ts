@@ -68,6 +68,7 @@ export interface DraftEvaluation {
   skillScores: SkillScores;
   notes: Record<CategoryKey, string[]>;
   manualNotes: Record<CategoryKey, string>;
+  touchedSkills?: Record<string, boolean>;
 }
 
 export interface AppData {

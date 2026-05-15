@@ -1,7 +1,7 @@
 "use client";
 
-import { Download, FileText, Lightbulb, Medal, Route, ShieldCheck, Target, type LucideIcon } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Download, FileText, Lightbulb, Medal, Route, Search, ShieldCheck, Target, type LucideIcon } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, PolarRadiusAxis } from "recharts";
 import { Button } from "@/components/ui/Button";
 import { useLanguage } from "@/hooks/use-language";
@@ -10,19 +10,53 @@ import type { Evaluation, Player } from "@/lib/types";
 
 type ReportLanguage = "en" | "ar" | "both";
 
-export function ReportView({ evaluation, player }: { evaluation: Evaluation | null; player: Player | undefined }) {
+export function ReportView({
+  evaluation,
+  player,
+  players = [],
+  evaluations = [],
+  onSelectEvaluation,
+  onStartEvaluation
+}: {
+  evaluation: Evaluation | null;
+  player: Player | undefined;
+  players?: Player[];
+  evaluations?: Evaluation[];
+  onSelectEvaluation?: (evaluationId: string) => void;
+  onStartEvaluation?: (playerId: string) => void;
+}) {
   const { language, t, toggleLanguage } = useLanguage();
-  const [reportLanguage, setReportLanguage] = useState<ReportLanguage>(language);
+  const [reportLanguage, setReportLanguage] = useState<ReportLanguage>(() => {
+    if (typeof window === "undefined") return language;
+    return (window.localStorage.getItem("coach-faisal-padel-lab:report-language") as ReportLanguage | null) ?? language;
+  });
+  const [reportSearch, setReportSearch] = useState("");
   const showEnglish = reportLanguage === "en" || reportLanguage === "both";
   const showArabic = reportLanguage === "ar" || reportLanguage === "both";
+  const reportOptions = useMemo(() => {
+    return players
+      .map((item) => {
+        const latest = evaluations
+          .filter((current) => current.playerIds.includes(item.id))
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+        return { player: item, latest };
+      })
+      .filter(({ player: item }) => item.name.toLowerCase().includes(reportSearch.toLowerCase()));
+  }, [evaluations, players, reportSearch]);
+
+  useEffect(() => {
+    window.localStorage.setItem("coach-faisal-padel-lab:report-language", reportLanguage);
+  }, [reportLanguage]);
+
   if (!evaluation || !player) {
     return (
-      <section className="pb-24">
+      <section className="space-y-4 pb-24">
         <div className="rounded-2xl border border-line bg-panel/80 p-6 text-center">
           <FileText className="mx-auto mb-3 text-volt" />
           <h1 className="text-xl font-black text-ivory">{t.report.noReport}</h1>
           <p className="mt-2 text-sm text-ivory/55">{t.report.noReportBody}</p>
         </div>
+        <ReportSelector reportOptions={reportOptions} selectedId={null} search={reportSearch} onSearch={setReportSearch} onSelectEvaluation={onSelectEvaluation} onStartEvaluation={onStartEvaluation} />
       </section>
     );
   }
@@ -64,23 +98,120 @@ export function ReportView({ evaluation, player }: { evaluation: Evaluation | nu
   const categoryLabel = (category: (typeof categories)[number]) => showArabic && showEnglish ? `${category.labelAr} / ${category.label}` : showArabic ? category.labelAr : category.label;
 
   async function exportPdf() {
-    if (!player) return;
-    const element = document.getElementById("report-export");
-    if (!element) return;
-    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
-    const canvas = await html2canvas(element, { backgroundColor: "#0B1820", scale: 2 });
-    const imgData = canvas.toDataURL("image/png");
+    const { jsPDF } = await import("jspdf");
     const pdf = new jsPDF("p", "mm", "a4");
-    const width = pdf.internal.pageSize.getWidth();
+    const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const height = (canvas.height * width) / canvas.width;
-    let y = 0;
-    pdf.addImage(imgData, "PNG", 0, y, width, height);
-    while (height + y > pageHeight) {
-      y -= pageHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, "PNG", 0, y, width, height);
+    const margin = 16;
+    let y = 18;
+    const isPdfArabic = reportLanguage === "ar";
+    const align = isPdfArabic ? "right" : "left";
+    const textX = isPdfArabic ? pageWidth - margin : margin;
+
+    const addText = (text: string, size = 10, color: [number, number, number] = [38, 38, 38], bold = false) => {
+      pdf.setFont("helvetica", bold ? "bold" : "normal");
+      pdf.setFontSize(size);
+      pdf.setTextColor(...color);
+      const lines = pdf.splitTextToSize(text, pageWidth - margin * 2);
+      lines.forEach((line: string) => {
+        if (y > pageHeight - 20) {
+          pdf.addPage();
+          y = 18;
+        }
+        pdf.text(line, textX, y, { align });
+        y += size * 0.48 + 2.2;
+      });
+    };
+    const addSection = (english: string, arabic: string) => {
+      y += 4;
+      pdf.setFillColor(11, 21, 26);
+      pdf.roundedRect(margin, y - 6, pageWidth - margin * 2, 10, 2, 2, "F");
+      addText(reportTitle(english, arabic), 12, [227, 107, 55], true);
+      y += 2;
+    };
+    const addBullets = (items: string[]) => {
+      items.forEach((item) => addText(`• ${item}`, 9.5, [62, 62, 62]));
+    };
+
+    pdf.setFillColor(5, 8, 13);
+    pdf.rect(0, 0, pageWidth, pageHeight, "F");
+    pdf.setFillColor(247, 251, 246);
+    pdf.roundedRect(8, 8, pageWidth - 16, pageHeight - 16, 4, 4, "F");
+    try {
+      const logo = await imageToDataUrl("/logo/app-logo-icon.png");
+      pdf.addImage(logo, "PNG", margin, 14, 18, 18);
+    } catch {
+      pdf.setFillColor(227, 107, 55);
+      pdf.circle(margin + 9, 23, 8, "F");
     }
+    pdf.setTextColor(8, 17, 22);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(16);
+    pdf.text("Coach Faisal Padel Performance Lab", margin + 23, 22);
+    pdf.setFontSize(9);
+    pdf.setTextColor(130, 95, 50);
+    pdf.text("كوتش فيصل بادل لاب", margin + 23, 28);
+    y = 42;
+
+    pdf.setFillColor(11, 21, 26);
+    pdf.roundedRect(margin, y, pageWidth - margin * 2, 42, 4, 4, "F");
+    pdf.setTextColor(255, 182, 84);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(12);
+    pdf.text(reportTitle("Final Score", "الدرجة النهائية"), textX, y + 10, { align });
+    pdf.setFontSize(34);
+    pdf.text(String(evaluation.finalScore), textX, y + 28, { align });
+    pdf.setFontSize(10);
+    pdf.setTextColor(247, 251, 246);
+    pdf.text(`${player.name}  •  ${reportTitle(evaluation.level, t.levels[evaluation.level as keyof typeof t.levels])}  •  ${reportTitle(evaluation.style, t.styles[evaluation.style as keyof typeof t.styles])}`, textX, y + 37, { align });
+    y += 54;
+
+    addSection("Performance Summary", "ملخص الأداء");
+    if (showArabic) addText(`ملف اللاعب الحالي يظهر كـ ${t.styles[evaluation.style as keyof typeof t.styles]}. أقوى المؤشرات هي ${strongestCategories.map(({ category }) => category.labelAr).join(" و")}، والقفزة القادمة تعتمد على رفع جودة ${weakestCategories[0].category.labelAr} تحت الضغط.`, 10, [45, 45, 45]);
+    if (showEnglish) addText(evaluation.reportData.generatedSummary, 10, [45, 45, 45]);
+
+    addSection("Performance Breakdown", "تفصيل الأداء");
+    categories.forEach((category) => {
+      pdf.setDrawColor(220, 220, 220);
+      pdf.setFillColor(238, 240, 238);
+      pdf.roundedRect(margin, y, pageWidth - margin * 2, 9, 2, 2, "F");
+      pdf.setFillColor(...hexToRgb(category.accent));
+      pdf.roundedRect(margin, y, (pageWidth - margin * 2) * (evaluation.categoryScores[category.key] / category.weight), 9, 2, 2, "F");
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(8, 17, 22);
+      pdf.text(`${categoryLabel(category)}: ${evaluation.categoryScores[category.key]} / ${category.weight}`, textX, y + 6.2, { align });
+      y += 13;
+    });
+
+    addSection("Strengths", "نقاط القوة");
+    if (showArabic) addBullets(arabicStrengths.length ? arabicStrengths : [t.misc.strongBaseline, t.misc.coachability, t.misc.competitiveAwareness]);
+    if (showEnglish) addBullets(evaluation.reportData.strengths.length ? evaluation.reportData.strengths : ["Strong baseline control", "High coachability", "Competitive awareness"]);
+
+    addSection("Development Areas", "مناطق التطوير");
+    if (showArabic) addBullets(arabicWeaknesses);
+    if (showEnglish) addBullets(evaluation.reportData.weaknesses);
+
+    addSection("Training Priorities", "أولويات التدريب");
+    if (showArabic) addBullets(weakestCategories.map(({ category }) => arabicPriorities[category.key]));
+    if (showEnglish) addBullets(evaluation.reportData.trainingPriorities);
+
+    addSection("4-Week Roadmap", "خطة ٤ أسابيع");
+    if (showArabic) {
+      addText(`الأسبوع ١-٢: قاعدة الحركة: ${arabicPriorities[weakestCategories[0].category.key]}.`, 10);
+      addText(`الأسبوع ٣-٤: طبقة الضغط: ${arabicPriorities[weakestCategories[1]?.category.key ?? weakestCategories[0].category.key]}.`, 10);
+      addText("أفضل أداء يظهر عندما يبقى الإيقاع تحت السيطرة قرب الشبكة. الوعي يجب أن يسبق الهجوم العشوائي.", 10, [120, 78, 40], true);
+    }
+    if (showEnglish) {
+      addText(`Week 1-2: ${evaluation.reportData.roadmap.weekOneTwo}`, 10);
+      addText(`Week 3-4: ${evaluation.reportData.roadmap.weekThreeFour}`, 10);
+      addText(evaluation.reportData.coachingInsight, 10, [120, 78, 40], true);
+    }
+
+    if (y > pageHeight - 46) {
+      pdf.addPage();
+      y = 18;
+    }
+    drawPdfRadar(pdf, evaluation, reportLanguage, margin, y + 5, pageWidth - margin * 2, 56);
     pdf.save(`${player.name.replace(/\s+/g, "-").toLowerCase()}-padel-report.pdf`);
   }
 
@@ -115,6 +246,8 @@ export function ReportView({ evaluation, player }: { evaluation: Evaluation | nu
           </button>
         ))}
       </div>
+
+      <ReportSelector reportOptions={reportOptions} selectedId={evaluation.id} search={reportSearch} onSearch={setReportSearch} onSelectEvaluation={onSelectEvaluation} onStartEvaluation={onStartEvaluation} />
 
       <div id="report-export" dir={reportLanguage === "ar" ? "rtl" : "ltr"} className="space-y-4 bg-graphite p-1 text-ivory">
         <div className="rounded-[1.75rem] border border-line bg-[radial-gradient(circle_at_top_right,rgba(56,223,255,0.16),transparent_30%),radial-gradient(circle_at_20%_10%,rgba(255,182,84,0.14),transparent_28%),rgba(7,16,20,0.94)] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.42),0_0_48px_rgba(56,223,255,0.10)] backdrop-blur-xl">
@@ -239,4 +372,109 @@ function ReportPanel({ title, icon: Icon, children }: { title: string; icon: Luc
 
 function List({ items, dir }: { items: string[]; dir?: "rtl" | "ltr" }) {
   return <ul dir={dir} className="space-y-2 text-sm text-ivory/65">{items.map((item) => <li key={item}>• {item}</li>)}</ul>;
+}
+
+function ReportSelector({
+  reportOptions,
+  selectedId,
+  search,
+  onSearch,
+  onSelectEvaluation,
+  onStartEvaluation
+}: {
+  reportOptions: { player: Player; latest?: Evaluation }[];
+  selectedId: string | null;
+  search: string;
+  onSearch: (value: string) => void;
+  onSelectEvaluation?: (evaluationId: string) => void;
+  onStartEvaluation?: (playerId: string) => void;
+}) {
+  const { language } = useLanguage();
+  return (
+    <div className="rounded-2xl border border-line bg-panel/80 p-4 shadow-blueglow">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber">{language === "ar" ? "اختيار التقرير" : "Report Selector"}</p>
+          <h2 className="text-lg font-black text-ivory">{language === "ar" ? "اختر لاعبًا أو تقريرًا" : "Choose a player or report"}</h2>
+        </div>
+        <Search className="text-cyan" size={18} />
+      </div>
+      <input value={search} onChange={(event) => onSearch(event.target.value)} className="h-11 w-full rounded-xl border border-line bg-black/25 px-3 text-sm text-ivory outline-none focus:border-cyan/60" placeholder={language === "ar" ? "ابحث عن لاعب" : "Search player"} />
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {reportOptions.slice(0, 8).map(({ player, latest }) => (
+          <button
+            key={player.id}
+            onClick={() => latest ? onSelectEvaluation?.(latest.id) : onStartEvaluation?.(player.id)}
+            className={`rounded-xl border p-3 text-left transition hover:-translate-y-0.5 ${latest?.id === selectedId ? "border-amber/60 bg-amber/15" : "border-line bg-white/[0.04] hover:border-cyan/35"}`}
+          >
+            <p className="font-black text-ivory">{player.name}</p>
+            <p className="mt-1 text-xs text-ivory/50">
+              {latest ? `${latest.finalScore}/100 • ${new Date(latest.createdAt).toLocaleDateString(language === "ar" ? "ar-KW" : "en-US")}` : language === "ar" ? "لا يوجد تقييم - ابدأ تقييمًا" : "No report - start evaluation"}
+            </p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+async function imageToDataUrl(src: string) {
+  const response = await fetch(src);
+  const blob = await response.blob();
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const clean = hex.replace("#", "");
+  const value = Number.parseInt(clean.length === 3 ? clean.split("").map((char) => char + char).join("") : clean, 16);
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+}
+
+type PdfDrawingContext = {
+  setDrawColor: (...args: number[]) => void;
+  setFillColor: (...args: number[]) => void;
+  line: (x1: number, y1: number, x2: number, y2: number) => void;
+  circle: (x: number, y: number, r: number, style?: string) => void;
+  text: (text: string, x: number, y: number, options?: { align?: "left" | "center" | "right" }) => void;
+  setFontSize: (size: number) => void;
+  setTextColor: (...args: number[]) => void;
+};
+
+function drawPdfRadar(pdf: PdfDrawingContext, evaluation: Evaluation, reportLanguage: ReportLanguage, x: number, y: number, width: number, height: number) {
+  const cx = x + width / 2;
+  const cy = y + height / 2 + 4;
+  const radius = Math.min(width, height) * 0.34;
+  const values = categories.map((category) => evaluation.categoryScores[category.key] / category.weight);
+  const point = (ratio: number, index: number) => {
+    const angle = -Math.PI / 2 + index * (Math.PI * 2 / values.length);
+    return [cx + Math.cos(angle) * radius * ratio, cy + Math.sin(angle) * radius * ratio];
+  };
+  pdf.setDrawColor(210, 214, 212);
+  for (let ring = 1; ring <= 4; ring += 1) {
+    const ringRatio = ring / 4;
+    categories.forEach((_, index) => {
+      const [x1, y1] = point(ringRatio, index);
+      const [x2, y2] = point(ringRatio, (index + 1) % categories.length);
+      pdf.line(x1, y1, x2, y2);
+    });
+  }
+  pdf.setDrawColor(227, 107, 55);
+  values.forEach((value, index) => {
+    const [x1, y1] = point(value, index);
+    const [x2, y2] = point(values[(index + 1) % values.length], (index + 1) % values.length);
+    pdf.line(x1, y1, x2, y2);
+    pdf.circle(x1, y1, 1.2, "F");
+  });
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(55, 55, 55);
+  categories.forEach((category, index) => {
+    const label = reportLanguage === "ar" ? category.labelAr : category.label;
+    const [lx, ly] = point(1.22, index);
+    pdf.text(label, lx, ly, { align: "center" });
+  });
 }

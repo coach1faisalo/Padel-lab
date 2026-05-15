@@ -2,14 +2,14 @@
 
 import { ChevronDown, ClipboardCheck, FileCheck2, Save, UserPlus } from "lucide-react";
 import { clsx } from "clsx";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { useLanguage } from "@/hooks/use-language";
 import { categories, ratingLabels, ratingLabelsAr, suggestedNotes, suggestedNotesAr } from "@/lib/constants";
 import { calculateCategoryScores, calculateFinalScore, createDefaultSkillScores, detectPlayingStyle, getPlayerLevel } from "@/lib/scoring";
 import type { AppData, CategoryKey, DraftEvaluation, MatchType, Rating } from "@/lib/types";
 
-export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, onAddPlayer }: { data: AppData; initialDraft: DraftEvaluation | null; onSaveDraft: (draft: DraftEvaluation) => void; onFinalize: (draft: DraftEvaluation) => void; onAddPlayer: (name: string) => void }) {
+export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, onAddPlayer }: { data: AppData; initialDraft: DraftEvaluation | null; onSaveDraft: (draft: DraftEvaluation) => void; onFinalize: (draft: DraftEvaluation) => void; onAddPlayer: (name: string) => { id: string } }) {
   const { language, t, toggleLanguage } = useLanguage();
   const isArabic = language === "ar";
   const [draft, setDraft] = useState<DraftEvaluation>(initialDraft ?? {
@@ -18,7 +18,8 @@ export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, on
     matchType: "Competitive",
     skillScores: createDefaultSkillScores(3),
     notes: { technique: [], positioning: [], transition: [], fitness: [], tactics: [] },
-    manualNotes: { technique: "", positioning: "", transition: "", fitness: "", tactics: "" }
+    manualNotes: { technique: "", positioning: "", transition: "", fitness: "", tactics: "" },
+    touchedSkills: {}
   });
   const [open, setOpen] = useState<CategoryKey | null>("positioning");
   const scores = useMemo(() => calculateCategoryScores(draft.skillScores), [draft.skillScores]);
@@ -26,10 +27,33 @@ export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, on
   const level = getPlayerLevel(finalScore);
   const style = detectPlayingStyle(scores, draft.skillScores);
 
+  useEffect(() => {
+    onSaveDraft(draft);
+  }, [draft, onSaveDraft]);
+
+  function touchedKey(category: CategoryKey, skillId: string) {
+    return `${category}:${skillId}`;
+  }
+
+  function scoreTone(value: number, touched = true) {
+    if (!touched) return "border-white/35 bg-white text-graphite";
+    if (value >= 4) return "border-neon-green/35 bg-neon-green/15 text-neon-green";
+    if (value >= 3) return "border-amber/35 bg-amber/15 text-amber";
+    return "border-red-400/35 bg-red-500/15 text-red-100";
+  }
+
+  function barColor(value: number) {
+    if (!value) return "#f7fbf6";
+    if (value >= 4) return "#8cff6a";
+    if (value >= 3) return "#ffb654";
+    return "#ff5b5b";
+  }
+
   function updateRating(category: CategoryKey, skillId: string, value: Rating) {
     setDraft((current) => ({
       ...current,
-      skillScores: { ...current.skillScores, [category]: { ...current.skillScores[category], [skillId]: value } }
+      skillScores: { ...current.skillScores, [category]: { ...current.skillScores[category], [skillId]: value } },
+      touchedSkills: { ...(current.touchedSkills ?? {}), [touchedKey(category, skillId)]: true }
     }));
   }
 
@@ -43,9 +67,12 @@ export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, on
   return (
     <section className="space-y-4 pb-28">
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="flex items-center gap-3">
+          <img src="/logo/app-logo-icon.png" alt="Coach Faisal Padel Performance Lab logo" className="h-12 w-12 rounded-2xl border border-amber/30 object-cover shadow-glow" />
+          <div>
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-amber">{t.evaluation.eyebrow}</p>
           <h1 className="text-2xl font-black text-ivory">{t.evaluation.title}</h1>
+          </div>
         </div>
         <div className="rounded-xl border border-line bg-white/[0.045] px-4 py-2 text-right">
           <p className="text-3xl font-black text-amber">{finalScore}</p>
@@ -86,7 +113,10 @@ export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, on
           onSubmit={(event) => {
             event.preventDefault();
             const name = String(new FormData(event.currentTarget).get("name") ?? "").trim();
-            if (name) onAddPlayer(name);
+            if (name) {
+              const player = onAddPlayer(name);
+              setDraft((current) => ({ ...current, playerIds: [player.id] }));
+            }
             event.currentTarget.reset();
           }}
         >
@@ -97,7 +127,9 @@ export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, on
 
       <div className="space-y-3">
         {categories.map((category) => {
-          const completed = Object.values(draft.skillScores[category.key]).every(Boolean);
+          const completed = category.skills.every((skill) => draft.touchedSkills?.[touchedKey(category.key, skill.id)]);
+          const anyTouched = category.skills.some((skill) => draft.touchedSkills?.[touchedKey(category.key, skill.id)]);
+          const categoryAverage = Object.values(draft.skillScores[category.key]).reduce((sum, value) => sum + value, 0) / category.skills.length;
           return (
             <div key={category.key} className="overflow-hidden rounded-2xl border border-line bg-panel/80 transition hover:border-amber/40">
               <button onClick={() => setOpen(open === category.key ? null : category.key)} className={clsx("flex w-full items-center justify-between gap-3 p-4", isArabic ? "text-right" : "text-left")}>
@@ -110,7 +142,7 @@ export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, on
                   <p className="mt-1 text-xs text-ivory/50">{isArabic ? category.philosophyAr : category.philosophy}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-black text-ivory">{scores[category.key]}/{category.weight}</span>
+                  <span className={clsx("rounded-full border px-3 py-1 text-sm font-black", scoreTone(categoryAverage, anyTouched))}>{scores[category.key]}/{category.weight}</span>
                   <ChevronDown className={clsx("text-ivory/50 transition", open === category.key && "rotate-180")} />
                 </div>
               </button>
@@ -118,13 +150,14 @@ export function EvaluationFlow({ data, initialDraft, onSaveDraft, onFinalize, on
                 <div className="space-y-5 border-t border-line p-4">
                   {category.skills.map((skill) => {
                     const value = draft.skillScores[category.key][skill.id];
+                    const touched = Boolean(draft.touchedSkills?.[touchedKey(category.key, skill.id)]);
                     return (
                       <label key={skill.id} className="block">
                         <div className="mb-2 flex items-center justify-between gap-3">
                           <span className="text-sm font-semibold text-ivory">{isArabic ? skill.nameAr : skill.name}</span>
-                          <span className="rounded-md bg-white/8 px-2 py-1 text-xs font-bold text-ivory/70">{value} • {isArabic ? ratingLabelsAr[value] : ratingLabels[value]}</span>
+                          <span className={clsx("rounded-md border px-2 py-1 text-xs font-bold", scoreTone(value, touched))}>{touched ? `${value} • ${isArabic ? ratingLabelsAr[value] : ratingLabels[value]}` : isArabic ? "غير مقيّم" : "Not rated"}</span>
                         </div>
-                        <input min={1} max={5} step={1} value={value} type="range" onChange={(event) => updateRating(category.key, skill.id, Number(event.target.value) as Rating)} className="w-full accent-[#B86A3A]" />
+                        <input min={1} max={5} step={1} value={value} type="range" onChange={(event) => updateRating(category.key, skill.id, Number(event.target.value) as Rating)} className="w-full" style={{ accentColor: touched ? barColor(value) : "#f7fbf6" }} />
                       </label>
                     );
                   })}

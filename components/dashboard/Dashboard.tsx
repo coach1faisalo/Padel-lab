@@ -1,13 +1,13 @@
 "use client";
 
-import { Activity, BarChart3, ClipboardPlus, Search, Target, Trophy, Users } from "lucide-react";
+import { Activity, BarChart3, ClipboardPlus, Search, Target, Trophy, UserRound, Users } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { useLanguage } from "@/hooks/use-language";
 import type { AppData } from "@/lib/types";
 
-export function Dashboard({ data, onNewEvaluation, onSelectEvaluation, search, onSearch }: { data: AppData; onNewEvaluation: () => void; onSelectEvaluation: (id: string) => void; search: string; onSearch: (value: string) => void }) {
+export function Dashboard({ data, onNewEvaluation, onSelectEvaluation, onSelectPlayer, search, onSearch }: { data: AppData; onNewEvaluation: () => void; onSelectEvaluation: (id: string) => void; onSelectPlayer: (playerId: string) => void; search: string; onSearch: (value: string) => void }) {
   const { language, t, toggleLanguage } = useLanguage();
   const isArabic = language === "ar";
   const average = data.evaluations.length ? Math.round(data.evaluations.reduce((sum, evaluation) => sum + evaluation.finalScore, 0) / data.evaluations.length) : 0;
@@ -36,7 +36,7 @@ export function Dashboard({ data, onNewEvaluation, onSelectEvaluation, search, o
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" dir={isArabic ? "rtl" : "ltr"}>
         <MetricCard label={t.dashboard.totalEvaluations} value={data.evaluations.length} icon={BarChart3} tone="cyan" />
         <MetricCard label={t.dashboard.activePlayers} value={data.players.length} icon={Users} />
         <MetricCard label={t.dashboard.averageScore} value={average || "--"} icon={Target} tone="amber" />
@@ -80,7 +80,13 @@ export function Dashboard({ data, onNewEvaluation, onSelectEvaluation, search, o
             </label>
             <div className="mt-3 space-y-2">
               {filteredPlayers.slice(0, 5).map((player) => (
-                <div key={player.id} className="rounded-lg bg-white/[0.04] px-3 py-2 text-sm font-semibold text-ivory/80">{player.name}</div>
+                <button key={player.id} onClick={() => onSelectPlayer(player.id)} className="group flex w-full items-center justify-between gap-3 rounded-xl border border-line bg-white/[0.04] px-3 py-3 text-sm font-semibold text-ivory/80 transition hover:border-amber/35 hover:bg-white/[0.07]">
+                  <span className="flex items-center gap-2">
+                    <UserRound size={16} className="text-amber" />
+                    {player.name}
+                  </span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.16em] text-ivory/35 group-hover:text-amber">{data.evaluations.some((evaluation) => evaluation.playerIds.includes(player.id)) ? t.report.eyebrow : t.evaluation.generate}</span>
+                </button>
               ))}
             </div>
           </div>

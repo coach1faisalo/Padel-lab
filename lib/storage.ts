@@ -32,6 +32,26 @@ export function savePlayer(player: Player): AppData {
   return next;
 }
 
+export function updatePlayer(playerId: string, updates: Pick<Player, "name">): AppData {
+  const data = loadAppData();
+  const next = {
+    ...data,
+    players: data.players.map((player) => player.id === playerId ? { ...player, ...updates } : player)
+  };
+  saveAppData(next);
+  return next;
+}
+
+export function deletePlayer(playerId: string): AppData {
+  const data = loadAppData();
+  const next = {
+    players: data.players.filter((player) => player.id !== playerId),
+    evaluations: data.evaluations.filter((evaluation) => !evaluation.playerIds.includes(playerId))
+  };
+  saveAppData(next);
+  return next;
+}
+
 export function saveEvaluation(evaluation: Evaluation): AppData {
   const data = loadAppData();
   const next = { ...data, evaluations: [evaluation, ...data.evaluations] };
@@ -48,4 +68,8 @@ export function loadDraft(): DraftEvaluation | null {
 
 export function saveDraft(draft: DraftEvaluation) {
   if (isBrowser()) window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+}
+
+export function clearDraft() {
+  if (isBrowser()) window.localStorage.removeItem(DRAFT_KEY);
 }
