@@ -98,6 +98,9 @@ export function ReportView({
   const categoryLabel = (category: (typeof categories)[number]) => showArabic && showEnglish ? `${category.labelAr} / ${category.label}` : showArabic ? category.labelAr : category.label;
 
   async function exportPdf() {
+    if (!evaluation || !player) return;
+    const currentEvaluation = evaluation;
+    const currentPlayer = player;
     const { jsPDF } = await import("jspdf");
     const pdf = new jsPDF("p", "mm", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -160,15 +163,15 @@ export function ReportView({
     pdf.setFontSize(12);
     pdf.text(reportTitle("Final Score", "الدرجة النهائية"), textX, y + 10, { align });
     pdf.setFontSize(34);
-    pdf.text(String(evaluation.finalScore), textX, y + 28, { align });
+    pdf.text(String(currentEvaluation.finalScore), textX, y + 28, { align });
     pdf.setFontSize(10);
     pdf.setTextColor(247, 251, 246);
-    pdf.text(`${player.name}  •  ${reportTitle(evaluation.level, t.levels[evaluation.level as keyof typeof t.levels])}  •  ${reportTitle(evaluation.style, t.styles[evaluation.style as keyof typeof t.styles])}`, textX, y + 37, { align });
+    pdf.text(`${currentPlayer.name}  •  ${reportTitle(currentEvaluation.level, t.levels[currentEvaluation.level as keyof typeof t.levels])}  •  ${reportTitle(currentEvaluation.style, t.styles[currentEvaluation.style as keyof typeof t.styles])}`, textX, y + 37, { align });
     y += 54;
 
     addSection("Performance Summary", "ملخص الأداء");
-    if (showArabic) addText(`ملف اللاعب الحالي يظهر كـ ${t.styles[evaluation.style as keyof typeof t.styles]}. أقوى المؤشرات هي ${strongestCategories.map(({ category }) => category.labelAr).join(" و")}، والقفزة القادمة تعتمد على رفع جودة ${weakestCategories[0].category.labelAr} تحت الضغط.`, 10, [45, 45, 45]);
-    if (showEnglish) addText(evaluation.reportData.generatedSummary, 10, [45, 45, 45]);
+    if (showArabic) addText(`ملف اللاعب الحالي يظهر كـ ${t.styles[currentEvaluation.style as keyof typeof t.styles]}. أقوى المؤشرات هي ${strongestCategories.map(({ category }) => category.labelAr).join(" و")}، والقفزة القادمة تعتمد على رفع جودة ${weakestCategories[0].category.labelAr} تحت الضغط.`, 10, [45, 45, 45]);
+    if (showEnglish) addText(currentEvaluation.reportData.generatedSummary, 10, [45, 45, 45]);
 
     addSection("Performance Breakdown", "تفصيل الأداء");
     categories.forEach((category) => {
@@ -176,24 +179,24 @@ export function ReportView({
       pdf.setFillColor(238, 240, 238);
       pdf.roundedRect(margin, y, pageWidth - margin * 2, 9, 2, 2, "F");
       pdf.setFillColor(...hexToRgb(category.accent));
-      pdf.roundedRect(margin, y, (pageWidth - margin * 2) * (evaluation.categoryScores[category.key] / category.weight), 9, 2, 2, "F");
+      pdf.roundedRect(margin, y, (pageWidth - margin * 2) * (currentEvaluation.categoryScores[category.key] / category.weight), 9, 2, 2, "F");
       pdf.setFontSize(8.5);
       pdf.setTextColor(8, 17, 22);
-      pdf.text(`${categoryLabel(category)}: ${evaluation.categoryScores[category.key]} / ${category.weight}`, textX, y + 6.2, { align });
+      pdf.text(`${categoryLabel(category)}: ${currentEvaluation.categoryScores[category.key]} / ${category.weight}`, textX, y + 6.2, { align });
       y += 13;
     });
 
     addSection("Strengths", "نقاط القوة");
     if (showArabic) addBullets(arabicStrengths.length ? arabicStrengths : [t.misc.strongBaseline, t.misc.coachability, t.misc.competitiveAwareness]);
-    if (showEnglish) addBullets(evaluation.reportData.strengths.length ? evaluation.reportData.strengths : ["Strong baseline control", "High coachability", "Competitive awareness"]);
+    if (showEnglish) addBullets(currentEvaluation.reportData.strengths.length ? currentEvaluation.reportData.strengths : ["Strong baseline control", "High coachability", "Competitive awareness"]);
 
     addSection("Development Areas", "مناطق التطوير");
     if (showArabic) addBullets(arabicWeaknesses);
-    if (showEnglish) addBullets(evaluation.reportData.weaknesses);
+    if (showEnglish) addBullets(currentEvaluation.reportData.weaknesses);
 
     addSection("Training Priorities", "أولويات التدريب");
     if (showArabic) addBullets(weakestCategories.map(({ category }) => arabicPriorities[category.key]));
-    if (showEnglish) addBullets(evaluation.reportData.trainingPriorities);
+    if (showEnglish) addBullets(currentEvaluation.reportData.trainingPriorities);
 
     addSection("4-Week Roadmap", "خطة ٤ أسابيع");
     if (showArabic) {
@@ -202,17 +205,17 @@ export function ReportView({
       addText("أفضل أداء يظهر عندما يبقى الإيقاع تحت السيطرة قرب الشبكة. الوعي يجب أن يسبق الهجوم العشوائي.", 10, [120, 78, 40], true);
     }
     if (showEnglish) {
-      addText(`Week 1-2: ${evaluation.reportData.roadmap.weekOneTwo}`, 10);
-      addText(`Week 3-4: ${evaluation.reportData.roadmap.weekThreeFour}`, 10);
-      addText(evaluation.reportData.coachingInsight, 10, [120, 78, 40], true);
+      addText(`Week 1-2: ${currentEvaluation.reportData.roadmap.weekOneTwo}`, 10);
+      addText(`Week 3-4: ${currentEvaluation.reportData.roadmap.weekThreeFour}`, 10);
+      addText(currentEvaluation.reportData.coachingInsight, 10, [120, 78, 40], true);
     }
 
     if (y > pageHeight - 46) {
       pdf.addPage();
       y = 18;
     }
-    drawPdfRadar(pdf, evaluation, reportLanguage, margin, y + 5, pageWidth - margin * 2, 56);
-    pdf.save(`${player.name.replace(/\s+/g, "-").toLowerCase()}-padel-report.pdf`);
+    drawPdfRadar(pdf, currentEvaluation, reportLanguage, margin, y + 5, pageWidth - margin * 2, 56);
+    pdf.save(`${currentPlayer.name.replace(/\s+/g, "-").toLowerCase()}-padel-report.pdf`);
   }
 
   return (
